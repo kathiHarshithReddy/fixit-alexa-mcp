@@ -25,7 +25,7 @@ const RULES = {
     { cause: "Failed water inlet valve (mains-wired)", likelihood: 15, diy: false, part_id: null } ] },
 };
 const HAZARD = /\bgas\b|smoke|spark|shock|burning|carbon monoxide|flood/i;
-const CONFIRM = /^\s*(yes|yeah|yep|confirm|order it|go ahead)\b/i;
+const CONFIRM = /^\s*(yes|yeah|yep|confirm|go ahead)\b/i;
 
 function buildServer() {
   const s = new McpServer({ name: "fixit", version: "0.1.0" });

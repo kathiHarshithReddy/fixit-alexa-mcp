@@ -27,7 +27,7 @@ function bot(h,speak){const d=document.createElement("div");d.className="b";d.in
 const say=(t)=>{const d=document.createElement("div");d.className="u";d.textContent=t;$("msgs").append(d)};
 const esc=(s)=>String(s).replace(/[&<>]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 async function handle(t){say(t);const s=t.toLowerCase().trim();try{
- if(pending&&/^(yes|yeah|yep|confirm|order it|go ahead)\b/.test(s)){const r=await call("confirm_purchase",{cart_id:pending,user_utterance:t});pending=null;
+ if(pending&&!/^(no|cancel|stop)\b/.test(s)){const r=await call("confirm_purchase",{cart_id:pending,user_utterance:t});if(r.ok)pending=null;
   return bot(r.ok?`Ordered: ${esc(r.order.name)} (mock order).`:esc(r.error),r.ok?"Done. Ordered.":r.error)}
  if(pending&&/^(no|cancel|stop)\b/.test(s)){pending=null;return bot("Cancelled. Nothing was ordered.","Cancelled.")}
  const type=/dishwasher/.test(s)?"dishwasher":/fridge|refrigerator/.test(s)?"refrigerator":lastType;
