@@ -1,0 +1,52 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fixit voice simulator</title><style>
+:root{--ink:#12304A;--paper:#F5F7FA;--line:#D3DCE5;--amber:#F5B335;--ok:#1B6B4D;--bad:#A33A2B}
+*{box-sizing:border-box}body{margin:0;font:16px/1.4 Carlito,system-ui,sans-serif;background:var(--ink);color:var(--ink);display:flex;gap:16px;padding:16px;height:100vh}
+.col{background:var(--paper);border-radius:16px;display:flex;flex-direction:column;overflow:hidden}#chat{flex:2}#wire{flex:1;min-width:300px}
+h2{margin:0;padding:12px 16px;background:#E3E9EF;font-size:16px;display:flex;justify-content:space-between}
+#msgs,#log{flex:1;overflow:auto;padding:12px 16px}.u{background:var(--ink);color:#fff;margin:8px 0 8px auto;padding:8px 14px;border-radius:16px;width:fit-content;max-width:80%}
+.b{background:#fff;border:1px solid var(--line);margin:8px 0;padding:8px 14px;border-radius:16px;max-width:90%}.row{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}.row span:first-child{flex:1}
+.t{font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px}.diy{background:#DDF1E8;color:var(--ok)}.pro{background:#FBE0DC;color:var(--bad)}.haz{border-color:var(--bad);color:var(--bad);font-weight:700}
+#log pre{font:11px/1.3 monospace;margin:0 0 8px;white-space:pre-wrap;word-break:break-all;background:#E9EEF3;padding:6px;border-radius:6px}.o{border-left:3px solid var(--amber)}
+.bar{display:flex;gap:8px;padding:10px 16px;border-top:1px solid var(--line)}input{flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font:inherit}
+button{font:inherit;border:0;border-radius:10px;padding:8px 12px;background:var(--ink);color:#fff;cursor:pointer}button.c{background:#fff;color:var(--ink);border:1px solid var(--line);font-size:13px}#mic{background:var(--amber);color:var(--ink)}
+.chips{padding:0 16px 8px;display:flex;flex-wrap:wrap;gap:6px}
+</style></head><body>
+<div class="col" id="chat"><h2>Fixit voice simulator <span><button class="c" id="ns">New session</button></span></h2><div id="msgs"></div>
+<div class="chips" id="chips"></div><div class="bar"><input id="in" placeholder="Type or press the mic"><button id="mic">Mic</button><button id="go">Send</button></div></div>
+<div class="col" id="wire"><h2>MCP wire log (JSON-RPC)</h2><div id="log"></div></div>
+<script>
+let rid=0,ver="2025-06-18",pending=null,lastParts=[],lastType=null;const $=(i)=>document.getElementById(i);
+const show=(dir,o)=>{const p=document.createElement("pre");p.className=dir==="→"?"":"o";p.textContent=dir+" "+(typeof o==="string"?o:JSON.stringify(o));$("log").append(p);$("log").scrollTop=1e9};
+async function rpc(method,params,notify){const body={jsonrpc:"2.0",method,params};if(!notify)body.id=++rid;show("→",body);
+ const r=await fetch("/mcp",{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json, text/event-stream","MCP-Protocol-Version":ver},body:JSON.stringify(body)});
+ if(notify){show("←","HTTP "+r.status);return}const j=await r.json();show("←",j);if(j.error)throw new Error(j.error.message);return j.result}
+async function call(name,args){const r=await rpc("tools/call",{name,arguments:args});if(r.isError)throw new Error(r.content[0].text);return JSON.parse(r.content[0].text)}
+async function handshake(){const r=await rpc("initialize",{protocolVersion:ver,capabilities:{},clientInfo:{name:"fixit-simulator",version:"0.1.0"}});ver=r.protocolVersion;
+ await rpc("notifications/initialized",{},true);const t=await rpc("tools/list",{});bot(`Connected to ${r.serverInfo.name}. ${t.tools.length} tools available.`)}
+function bot(h,speak){const d=document.createElement("div");d.className="b";d.innerHTML=h;$("msgs").append(d);$("msgs").scrollTop=1e9;if(speak&&speechSynthesis)speechSynthesis.speak(new SpeechSynthesisUtterance(speak))}
+const say=(t)=>{const d=document.createElement("div");d.className="u";d.textContent=t;$("msgs").append(d)};
+const esc=(s)=>String(s).replace(/[&<>]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+async function handle(t){say(t);const s=t.toLowerCase().trim();try{
+ if(pending&&/^(yes|yeah|yep|confirm|order it|go ahead)\b/.test(s)){const r=await call("confirm_purchase",{cart_id:pending,user_utterance:t});pending=null;
+  return bot(r.ok?`Ordered: ${esc(r.order.name)} (mock order).`:esc(r.error),r.ok?"Done. Ordered.":r.error)}
+ if(pending&&/^(no|cancel|stop)\b/.test(s)){pending=null;return bot("Cancelled. Nothing was ordered.","Cancelled.")}
+ const type=/dishwasher/.test(s)?"dishwasher":/fridge|refrigerator/.test(s)?"refrigerator":lastType;
+ if(/\b(register|i have a|my .* is a)\b/.test(s)&&type){const m=s.match(/(bosch|samsung|lg|whirlpool|ge)\s+([a-z0-9-]+)/i),y=s.match(/(20\d\d)/);
+  if(!m||!y)return bot("Tell me the brand, model and year, e.g. \"I have a Bosch SHE53 dishwasher from 2023\".");
+  lastType=type;await call("register_appliance",{type,brand:m[1],model:m[2].toUpperCase(),installed_year:+y[1]});return bot(`Saved your ${type}. I'll remember it in future sessions.`,"Saved.")}
+ if(/\b(order|buy)\b/.test(s)){const p=lastParts.find((x)=>x.diy&&x.part_id);if(!p)return bot("Diagnose a problem first.");
+  const c=await call("build_cart",{part_id:p.part_id});pending=c.cart_id;return bot(`<b>${esc(c.name)}</b> $${c.price.toFixed(2)}<br>${esc(c.prompt)}`,c.prompt)}
+ if(/\b(plumber|technician|book|visit|pro)\b/.test(s)&&lastType){const r=await call("propose_visits",{appliance_type:lastType});
+  const d=document.createElement("div");d.className="b";d.textContent="Pick a time:";r.slots.forEach((x)=>{const b=document.createElement("button");b.className="c";b.textContent=x.when;b.style.margin="4px";
+   b.onclick=async()=>{const k=await call("book_visit",{slot_id:x.slot_id,appliance_type:lastType});bot(`Booked ${esc(x.when)} (mock).`,"Booked.")};d.append(b)});$("msgs").append(d);return}
+ if(/maintenance|due|plan/.test(s)){const r=await call("get_maintenance_plan",{});return bot(r.appliances.length?r.appliances.map((a)=>`${esc(a.brand)} ${esc(a.model)} ${a.type}: ${esc(a.due)}`).join("<br>"):"No appliances yet.")}
+ if(type)lastType=type;const r=await call("diagnose_issue",{symptom:t,appliance_type:type||undefined});
+ if(r.hazard)return bot(`<span class="haz">${esc(r.message)}</span>`,r.message);if(r.needs)return bot(esc(r.message),r.message);
+ lastParts=r.causes;bot(`<b>${esc(r.appliance.brand)} ${esc(r.appliance.model)}</b>`+r.causes.map((c)=>`<div class="row"><span>${esc(c.cause)}</span><span class="t ${c.diy?"diy":"pro"}">${c.diy?"Safe to DIY":"Call a pro"}</span><b>${c.likelihood}%</b></div>`).join("")+`<div>Say "order it" for the top DIY part.</div>`,"Here are the likely causes.")
+}catch(e){bot("Error: "+esc(e.message))}}
+const send=()=>{const v=$("in").value.trim();if(v){$("in").value="";handle(v)}};$("go").onclick=send;$("in").onkeydown=(e)=>e.key==="Enter"&&send();
+["I have a Bosch SHE53 dishwasher from 2023","My dishwasher isn't draining","Order it","Yes","I smell gas near the dishwasher","Book a pro"].forEach((t)=>{const b=document.createElement("button");b.className="c";b.textContent=t;b.onclick=()=>handle(t);$("chips").append(b)});
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;$("mic").onclick=()=>{if(!SR)return bot("Speech input isn't supported in this browser. Type instead.");const r=new SR();r.lang="en-US";r.onresult=(e)=>handle(e.results[0][0].transcript);r.start()};
+$("ns").onclick=async()=>{$("msgs").innerHTML="";$("log").innerHTML="";pending=null;lastParts=[];lastType=null;await handshake();bot("New session started. Household memory persists on the server.")};
+handshake();
+</script></body></html>

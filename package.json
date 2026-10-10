@@ -1,0 +1,19 @@
+{
+ "name": "fixit-alexa-mcp",
+ "version": "0.1.0",
+ "type": "module",
+ "description": "Self-hosted MCP server that remembers your home, diagnoses appliance problems by voice, and never spends without a spoken yes",
+ "license": "MIT",
+ "scripts": {
+  "start": "node server/index.js"
+ },
+ "dependencies": {
+  "@modelcontextprotocol/sdk": "^1.20.0",
+  "express": "^4.21.0",
+  "zod": "^3.25.0",
+  "@aws-sdk/client-bedrock-runtime": "^3.700.0",
+  "@aws-sdk/client-dynamodb": "^3.700.0",
+  "@aws-sdk/lib-dynamodb": "^3.700.0",
+  "serverless-http": "^3.2.0"
+ }
+}
