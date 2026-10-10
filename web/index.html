@@ -33,7 +33,7 @@ async function handle(t){say(t);const s=t.toLowerCase().trim();try{
  const type=/dishwasher/.test(s)?"dishwasher":/fridge|refrigerator/.test(s)?"refrigerator":lastType;
  if(/\b(register|i have a|my .* is a)\b/.test(s)&&type){const m=s.match(/(bosch|samsung|lg|whirlpool|ge)\s+([a-z0-9-]+)/i),y=s.match(/(20\d\d)/);
   if(!m||!y)return bot("Tell me the brand, model and year, e.g. \"I have a Bosch SHE53 dishwasher from 2023\".");
-  lastType=type;await call("register_appliance",{type,brand:m[1],model:m[2].toUpperCase(),installed_year:+y[1]});return bot(`Saved your ${type}. I'll remember it in future sessions.`,"Saved.")}
+  lastType=type;await call("register_appliance",{type,brand:m[1][0].toUpperCase()+m[1].slice(1),model:m[2].toUpperCase(),installed_year:+y[1]});return bot(`Saved your ${type}. I'll remember it in future sessions.`,"Saved.")}
  if(/\b(order|buy)\b/.test(s)){const p=lastParts.find((x)=>x.diy&&x.part_id);if(!p)return bot("Diagnose a problem first.");
   const c=await call("build_cart",{part_id:p.part_id});pending=c.cart_id;return bot(`<b>${esc(c.name)}</b> $${c.price.toFixed(2)}<br>${esc(c.prompt)}`,c.prompt)}
  if(/\b(plumber|technician|book|visit|pro)\b/.test(s)&&lastType){const r=await call("propose_visits",{appliance_type:lastType});
